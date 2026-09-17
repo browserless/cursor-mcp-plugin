@@ -1,117 +1,172 @@
 # Browserless MCP — Tool Reference
 
-The hosted server at `https://mcp.browserless.io/mcp` exposes **9 tools**. Each is documented below with its purpose, key parameters, and an example prompt that exercises it.
+The hosted server at `https://mcp.browserless.io/mcp` exposes **14 tools** and **2 resources**, verified against `browserless-mcp` 1.28.1.
 
-> The authoritative schemas live on the running server — Cursor pulls them via the standard MCP `tools/list` call. The summaries below match what the server returns at the time of writing.
+> The authoritative schemas live on the running server — Cursor pulls them via the standard MCP `tools/list` call. Regenerate this list at any time with:
+>
+> ```bash
+> BROWSERLESS_TOKEN=your_token node scripts/verify-mcp.mjs
+> ```
 
----
-
-## `browserless_agent`
-
-A stateful, reasoning-driven browser session. The agent follows a ReAct loop: **Reason → Act → Observe**.
-
-1. `goto` to navigate
-2. `snapshot` to observe the page (returns interactive elements with `ref=` selectors)
-3. Plan and `click` / `type` / `select` / `evaluate` etc.
-4. Re-snapshot if the page changed
-5. `close` when done
-
-**Selectors come from the snapshot, never from training data.** Every interactable element is tagged with `ref=` (regular CSS) or `deep-ref=` (shadow DOM). Pass these directly to action commands.
-
-Use `commands: [...]` to batch sequential actions on the same page state — e.g. fill a form in one call.
-
-**Example prompt:**
-
-> Use the browserless agent to log into hacker-news (assume credentials in env), open the front page, snapshot, and return the top 10 story titles + scores in markdown.
-
----
-
-## `browserless_smartscraper`
-
-Single-shot URL fetch with cascading strategies (HTTP fetch, proxy, headless browser, captcha solving) and pluggable output formats.
-
-**Key params:** `url` (required), `formats` (`["markdown" | "html" | "screenshot" | "pdf" | "links"]`), `timeout`.
-
-**Example prompt:**
-
-> Use browserless_smartscraper on `https://stripe.com/pricing` and return both the markdown and the screenshot.
+| Tool | Group |
+|---|---|
+| `browserless_smartscraper` | Scrape & extract |
+| `browserless_crawl` | Scrape & extract |
+| `browserless_map` | Scrape & extract |
+| `browserless_export` | Scrape & extract |
+| `browserless_function` | Scrape & extract |
+| `browserless_search` | Search |
+| `browserless_agent` | Agent |
+| `browserless_skill` | Agent |
+| `browserless_performance` | Audit |
+| `browserless_account` | Account & diagnostics |
+| `browserless_usage` | Account & diagnostics |
+| `browserless_logs` | Account & diagnostics |
+| `browserless_sessions` | Account & diagnostics |
+| `browserless_profiles` | Account & diagnostics |
 
 ---
 
-## `browserless_search`
+## Scrape & extract
 
-Web/news/image search via SearXNG, with optional per-result scraping. Geo-targetable.
+### `browserless_smartscraper`
 
-**Key params:** `query`, `sources` (`web` / `news` / `images`), `country`, `lang`, `tbs` (`day`/`week`/`month`/`year`), `categories` (`github`/`research`/`pdf`), `scrapeOptions`.
+Scrape a **single** page and return HTML, markdown, raw DOM text, links, screenshots, or PDFs plus page metadata. Handles JavaScript-heavy pages and anti-bot measures automatically.
 
-**Example prompt:**
+**Key params:** `url` (required), `formats`, `onlyMainContent`, `includeTags` / `excludeTags`, `headers`, `waitFor`, `profile`, `timeout`.
 
-> Use browserless_search to find the top 5 GitHub repos for "self-hosted vector database", `categories: ["github"]`, then scrape each as markdown via `scrapeOptions.formats: ["markdown"]` with `onlyMainContent: true`.
+> Use `browserless_smartscraper` on `https://stripe.com/pricing` with `formats: ["markdown"]` and `onlyMainContent: true`.
 
----
+### `browserless_crawl`
 
-## `browserless_function`
+Crawl a site from a seed URL and scrape every discovered page, following links to a configurable depth.
 
-Run arbitrary Puppeteer JS (ES Module) on the Browserless cloud. The default export receives `{ page, context }` and should return `{ data, type }`, where `type` becomes the HTTP `Content-Type`.
+**Key params:** `url` (required), `limit`, `maxDepth`, `includePaths` / `excludePaths`, `allowSubdomains`, `allowExternalLinks`, `sitemap`, `delay`, `scrapeOptions`, `waitForCompletion`.
 
-**Use when:** smartscraper isn't enough — multi-step interaction, custom DOM extraction, conditional logic, etc.
+> Crawl `https://docs.browserless.io` with `maxDepth: 3`, `limit: 50`, `formats: ["markdown"]`.
 
-**Example prompt:**
+### `browserless_map`
 
-> Use browserless_function to navigate to `https://example.com`, count the number of `<a>` tags, and return `{ data: { count }, type: "application/json" }`.
+Discover the URLs on a site via sitemap and link extraction. Use `search` to order results by relevance.
 
----
+**Key params:** `url` (required), `search`, `limit`, `sitemap`, `includeSubdomains`, `ignoreQueryParameters`.
 
-## `browserless_download`
+> Map `https://docs.browserless.io` with `search: "BrowserQL"` and return the top 30 URLs.
 
-Same shape as `browserless_function`, but the JS is expected to trigger a file download in the browser (e.g. clicking a download link). The downloaded file is returned with its original `Content-Type`.
+### `browserless_export`
 
-**Example prompt:**
+Fetch a URL and return its native content (HTML, PDF, image) with auto-detected Content-Type. Set `includeResources: true` to bundle the page plus its CSS/JS/images into a ZIP for offline use.
 
-> Use browserless_download to fetch the CSV behind the "Export" button on `https://example.com/reports/123`.
+**Key params:** `url` (required), `includeResources`, `gotoOptions`, `bestAttempt`, `waitForTimeout`, `profile`.
 
----
+### `browserless_function`
 
-## `browserless_export`
+Run custom Puppeteer JavaScript on the Browserless cloud. Your function receives a `page` object and optional `context`, and returns `{ data, type }` where `type` sets the response Content-Type. Real MIME types (`image/png`, `application/pdf`) come back as proper content blocks rather than base64 text.
 
-Server-side URL exporter. Returns the page's native content (HTML, PDF, image, etc.) with auto-detected `Content-Type`. Set `includeResources: true` to bundle the page plus all linked CSS/JS/images into a single ZIP archive.
-
-**Example prompt:**
-
-> Use browserless_export with `includeResources: true` on `https://example.com/article/42` and save the offline bundle.
+**Key params:** `code` (required), `context`, `profile`, `timeout`.
 
 ---
 
-## `browserless_map`
+## Search
 
-Sitemap + link-extraction crawler that returns a list of URLs (with optional titles and descriptions). Use the `search` parameter to rank results by relevance to a query.
+### `browserless_search`
 
-**Key params:** `url`, `limit` (max 5000), `includeSubdomains`, `ignoreQueryParameters`, `sitemap` (`include` / `skip` / `only`), `search`.
+Web, news, or image search via SearXNG, with optional per-result scraping. Geo-targetable and time-filterable.
 
-**Example prompt:**
+**Key params:** `query` (required), `sources`, `categories`, `country`, `lang`, `location`, `tbs`, `limit`, `scrapeOptions`.
 
-> Use browserless_map on `https://docs.browserless.io` with `search: "BrowserQL"`, return the top 30 URLs.
+> Search for "self-hosted vector database" with `categories: ["github"]`, then scrape each result as markdown.
 
 ---
 
-## `browserless_performance`
+## Agent
 
-Run a Lighthouse audit. Returns scores and metrics for `accessibility`, `best-practices`, `performance`, `pwa`, `seo`. Optionally pass [Lighthouse performance budgets](https://developer.chrome.com/docs/lighthouse/performance/performance-budgets).
+### `browserless_agent`
+
+A stateful, reasoning-driven browser session following a ReAct loop: **Reason → Act → Observe**.
+
+1. Check for a site recipe via `browserless_skill { site: "<host>" }`
+2. `goto` to navigate
+3. `snapshot` to observe (returns interactive elements tagged `ref=` for regular CSS, `deep-ref=` for shadow DOM)
+4. Act — `click` / `type` / `select` / `evaluate`
+5. Re-snapshot if the page changed, `close` when done
+
+**Selectors come from the snapshot, never from training data.** Use `commands: [...]` to batch sequential actions against the same page state.
+
+**Key params:** `method`, `params`, `commands`, `sessionId`, `profile`, `createProfile`, `proxy`, `record`, `allowedDomains`, `humanlike`, `os`.
+
+### `browserless_skill`
+
+Loads Browserless agent skills on demand, or discovers site-specific recipes tuned for a given host.
+
+- `{ site: "<host>" }` — list recipes for that host, returned as pointers
+- `{ id: "<id>" }` — load a skill body, either an in-house skill or a `host/slug` site recipe
+
+In-house skills cover `shadow-dom`, `cookie-consent`, `modals`, `snapshot-misses`, `dynamic-content`, `screenshots`, `vision-fallback`, `tabs`, `autonomous-login`, `captchas`, and `file-transfers`.
+
+---
+
+## Audit
+
+### `browserless_performance`
+
+Run a Lighthouse audit. Returns scores and metrics for accessibility, best-practices, performance, PWA, and SEO. Supports [performance budgets](https://developer.chrome.com/docs/lighthouse/performance/performance-budgets).
+
+**Key params:** `url` (required), `categories`, `budgets`, `timeout`.
 
 > Audits typically take 30s–120s.
 
-**Example prompt:**
+---
 
-> Run browserless_performance on `https://example.com` for `categories: ["performance", "accessibility"]` and report scores.
+## Account & diagnostics
+
+These five tools are **read-only** and scoped to the account behind the configured token.
+
+### `browserless_account`
+
+Plan, unit balance, billing period, and the *names* of the account's API keys. Never returns API token values.
+
+**Key params:** `action` (required).
+
+### `browserless_usage`
+
+Request and unit consumption: successes, errors, timeouts, queueing, peak concurrency, captchas, proxy bytes, units.
+
+**Key params:** `timeframe`, `apiKeyIds`.
+
+### `browserless_logs`
+
+Browserless's record of recent requests — what was attempted, whether it failed, why it stopped, how long it took, what it cost. The retention window depends on the account plan.
+
+**Key params:** `startTime` / `endTime`, `requestId`, `url`, `outcome`, `endpoint`, `reason`, `levels`, `cursor`.
+
+### `browserless_sessions`
+
+Inspect running browsers, persistent sessions on dedicated workers, recorded replays, and 1Password credential integrations. Read-only — it never stops a session.
+
+**Key params:** `action` (required — one of `active`, `persistent`, `replays`, `replay`, `integrations`), `sessionId`, `search`.
+
+> `action: "replay"` downloads a recording and returns a self-contained playable rrweb page. Replays capture what happened in the browser, so treat them like any other session recording.
+
+### `browserless_profiles`
+
+List authentication profiles saved for the current token. A profile is a saved logged-in browser state (cookies + storage) replayed by passing its name as `profile` to other tools. Returns profile names plus cookie/origin counts and last-used time — **not** the cookie values themselves.
+
+**Key params:** `limit`, `offset`.
 
 ---
 
-## `browserless_crawl`
+## Resources
 
-Recursively crawl + scrape a site. Starts from a seed URL and follows links up to a configurable depth. Returns the scraped content for every page.
+Alongside its tools, the server exposes two read-only MCP resources. Tools are actions the model calls; resources are content it can read into context. Cursor lists them separately from tools.
 
-**Key params:** `url`, `limit` (max 10,000), `maxDepth`, `includePaths` / `excludePaths` (regex), `allowSubdomains`, `allowExternalLinks`, `sitemap` (`auto` / `force` / `skip`), `delay`, `scrapeOptions`.
+| URI | Name | MIME type |
+|---|---|---|
+| `browserless://status` | Browserless Service Status | `application/json` |
+| `browserless://api-docs` | Browserless API Documentation | `text/markdown` |
 
-**Example prompt:**
+Regenerate this list along with the tools:
 
-> Use browserless_crawl on `https://docs.browserless.io` with `maxDepth: 3` and `limit: 50`, formats `["markdown"]`, `onlyMainContent: true`. Return the URL list and the markdown of the top result.
+```bash
+BROWSERLESS_TOKEN=your_token node scripts/verify-mcp.mjs
+```
