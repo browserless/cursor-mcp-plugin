@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 // Emits Cursor install deeplinks for the Browserless MCP server.
+// These back the manual-install fallback only; the Marketplace listing is the
+// primary install path.
 // Run: node scripts/build-deeplinks.mjs
 //
 // Output is committed verbatim into README.md. Re-run when the server URL
@@ -14,6 +16,7 @@ const SERVER_URL = "https://mcp.browserless.io/mcp";
 const NAME = "browserless";
 
 const bearerCfg = {
+  type: "http",
   url: SERVER_URL,
   headers: { Authorization: "Bearer YOUR_BROWSERLESS_TOKEN" },
 };
