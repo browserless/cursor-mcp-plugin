@@ -57,7 +57,7 @@ To run this plugin from a local checkout — for development, or to test a chang
 git clone https://github.com/browserless/cursor-mcp-plugin.git ~/.cursor/plugins/local/browserless
 ```
 
-Reload Cursor. The plugin appears under **Settings → Plugins** as a local plugin and prompts for the token the same way.
+Reload Cursor. The plugin appears under **Settings → Plugins** as a local plugin, with the same **Authenticate** button as a Marketplace install. Click it and sign in with your Browserless account.
 
 ## Verifying the install
 

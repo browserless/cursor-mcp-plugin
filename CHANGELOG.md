@@ -10,4 +10,4 @@ All notable changes to this plugin will be documented here.
 - Added `assets/logo.svg`: the Browserless mark on a padded dark tile.
 - Added `scripts/verify-mcp.mjs` to check connectivity, tool discovery, and tool execution against the hosted server.
 - Documented the two MCP resources the server exposes: `browserless://status` and `browserless://api-docs`.
-- Corrected the documented tool set against `browserless-mcp` 1.28.1: 14 tools, not 9. `browserless_download` is no longer served; `browserless_skill`, `browserless_account`, `browserless_usage`, `browserless_logs`, `browserless_sessions`, and `browserless_profiles` were undocumented.
+- Corrected the documented tool set against `browserless-mcp` 1.30.0: 14 tools, not 9. `browserless_download` is no longer served; `browserless_skill`, `browserless_account`, `browserless_usage`, `browserless_logs`, `browserless_sessions`, and `browserless_profiles` were undocumented.
