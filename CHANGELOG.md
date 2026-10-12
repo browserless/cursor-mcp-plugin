@@ -2,6 +2,10 @@
 
 All notable changes to this plugin will be documented here.
 
+## Unreleased
+
+- Documented the `browserless_agent` session-lifetime change in MCP server v1.33.0: sessions are one-shot by default, and multi-step work opts in with `keepSessionAlive: true`. Updated `docs/tools.md` and `examples/agent-research.md` accordingly.
+
 ## 1.0.0 — initial release
 
 - Added the `.cursor-plugin/plugin.json` manifest so the repository installs as a Cursor plugin.

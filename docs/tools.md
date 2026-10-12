@@ -93,7 +93,9 @@ A stateful, reasoning-driven browser session following a ReAct loop: **Reason â†
 
 **Selectors come from the snapshot, never from training data.** Use `commands: [...]` to batch sequential actions against the same page state.
 
-**Key params:** `method`, `params`, `commands`, `sessionId`, `profile`, `createProfile`, `proxy`, `record`, `allowedDomains`, `humanlike`, `os`.
+**Session lifetime.** In MCP server v1.33.0 and later, a call's browser closes when its command batch finishes unless you opt in. For multi-step work, set `keepSessionAlive: true` on the first call and pass the returned `sessionId` on every later call; an explicit `keepSessionAlive: false` closes the session. Earlier server versions kept sessions alive by default. See [Browser Agent: session lifetime](https://docs.browserless.io/mcp/browser-agent#session-lifetime).
+
+**Key params:** `method`, `params`, `commands`, `sessionId`, `keepSessionAlive`, `profile`, `createProfile`, `proxy`, `record`, `allowedDomains`, `humanlike`, `os`.
 
 ### `browserless_skill`
 

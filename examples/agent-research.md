@@ -4,7 +4,7 @@ Demonstrates the stateful agent loop: navigate → snapshot → act → re-snaps
 
 ## Prompt
 
-> Use `browserless_agent` to research the top 3 self-hosted vector databases.
+> Use `browserless_agent` to research the top 3 self-hosted vector databases. Set `keepSessionAlive: true` on the first call and pass the returned `sessionId` on every later call so the browser session persists.
 >
 > Steps:
 >
@@ -17,7 +17,7 @@ Demonstrates the stateful agent loop: navigate → snapshot → act → re-snaps
 
 ## Why this works
 
-- `browserless_agent` keeps a single browser session alive across all `goto` calls — cookies, redirects, and rate-limit cookies persist.
+- With `keepSessionAlive: true` on the first call and the returned `sessionId` passed on later calls, `browserless_agent` keeps a single browser session alive across all `goto` calls — cookies, redirects, and rate-limit cookies persist. MCP server v1.33.0 and later closes the browser after each call by default; earlier versions kept it alive.
 - `snapshot` returns interactive elements with `ref=` selectors, so the model never has to guess CSS selectors from training data.
 - `close` releases the browser slot when done; without it the session sits idle until the server timeout.
 
