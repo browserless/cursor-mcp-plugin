@@ -135,10 +135,10 @@ More examples in [examples/](examples/).
 ## Plugin layout
 
 The plugin connects to a remote MCP server; installing it in Cursor does not require
-local Node.js. The dependency-free maintainer scripts use Node.js **26.13.0**,
-pinned in `.nvmrc`. With nvm installed, run `nvm install` and `nvm use` in this
-repository. Official Node 26 Linux binaries require `libatomic.so.1` (provided by
-`libatomic1` on Debian/Ubuntu). This pin does not change Cursor's runtime or the
+local Node.js. The dependency-free maintainer scripts use **Node 26**, selected in
+`.nvmrc`. With nvm installed, run `nvm install` and `nvm use` in this repository.
+Official Node 26 Linux binaries require `libatomic.so.1` (provided by `libatomic1`
+on Debian/Ubuntu). This selection does not change Cursor's runtime or the
 hosted server's runtime.
 
 Offline checks (also checked on Node 22 and 24):
