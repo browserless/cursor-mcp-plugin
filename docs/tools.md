@@ -1,6 +1,6 @@
 # Browserless MCP — Tool Reference
 
-The hosted server at `https://mcp.browserless.io/mcp` exposes **14 tools** and **2 resources**, verified against `browserless-mcp` 1.28.1.
+The hosted server at `https://mcp.browserless.io/mcp` exposes **14 tools** and **2 resources**, which is the inventory in Browserless's hosted setup guide. `browserless-mcp` 1.37.1 also registers `browserless_live_url` plus `browserless_link_connect` and `browserless_link_checkout`; the hosted guide still lists 14 tools, and Link checkout is not on the hosted fleet. Session lifetime follows the v1.33.0 contract. Parameter details the hosted guide omits, including `rawText`, come from the 1.37.1 schemas.
 
 > The authoritative schemas live on the running server — Cursor pulls them via the standard MCP `tools/list` call. Regenerate this list at any time with:
 >
@@ -31,7 +31,7 @@ The hosted server at `https://mcp.browserless.io/mcp` exposes **14 tools** and *
 
 ### `browserless_smartscraper`
 
-Scrape a **single** page and return HTML, markdown, raw DOM text, links, screenshots, or PDFs plus page metadata. Handles JavaScript-heavy pages and anti-bot measures automatically.
+Scrape a **single** page. `formats` is one or more of `markdown` (the default), `html`, `rawText`, `links`, `screenshot`, and `pdf`. `rawText` is DOM text with `script`, `style`, and `noscript` removed. Handles JavaScript-heavy pages and anti-bot measures automatically.
 
 **Key params:** `url` (required), `formats`, `onlyMainContent`, `includeTags` / `excludeTags`, `headers`, `waitFor`, `profile`, `timeout`.
 
@@ -39,11 +39,11 @@ Scrape a **single** page and return HTML, markdown, raw DOM text, links, screens
 
 ### `browserless_crawl`
 
-Crawl a site from a seed URL and scrape every discovered page, following links to a configurable depth.
+Crawl a site from a seed URL and scrape every discovered page, following links to a configurable depth. Crawl is in beta and only available on Cloud plans.
 
 **Key params:** `url` (required), `limit`, `maxDepth`, `includePaths` / `excludePaths`, `allowSubdomains`, `allowExternalLinks`, `sitemap`, `delay`, `scrapeOptions`, `waitForCompletion`.
 
-> Crawl `https://docs.browserless.io` with `maxDepth: 3`, `limit: 50`, `formats: ["markdown"]`.
+> Crawl `https://docs.browserless.io` with `maxDepth: 3`, `limit: 50`, and `scrapeOptions: { formats: ["markdown"] }`.
 
 ### `browserless_map`
 
@@ -83,17 +83,27 @@ Web, news, or image search via SearXNG, with optional per-result scraping. Geo-t
 
 ### `browserless_agent`
 
-A stateful, reasoning-driven browser session following a ReAct loop: **Reason → Act → Observe**.
+A reasoning-driven browser session following a ReAct loop: **Reason → Act → Observe**. On MCP server v1.33.0 and later the browser is one-shot unless you opt in. Earlier versions kept the session alive by default.
 
 1. Check for a site recipe via `browserless_skill { site: "<host>" }`
 2. `goto` to navigate
 3. `snapshot` to observe (returns interactive elements tagged `ref=` for regular CSS, `deep-ref=` for shadow DOM)
 4. Act — `click` / `type` / `select` / `evaluate`
-5. Re-snapshot if the page changed, `close` when done
+5. Re-snapshot if the page changed, then end the session when done
 
-**Selectors come from the snapshot, never from training data.** Use `commands: [...]` to batch sequential actions against the same page state.
+**Selectors come from the snapshot, never from training data.** Use `commands: [...]` to batch sequential actions against the same page state. A `goto` in the same batch can be followed by `snapshot` or `text`; do not reuse selectors from an old snapshot after a navigation.
 
-**Key params:** `method`, `params`, `commands`, `sessionId`, `profile`, `createProfile`, `proxy`, `record`, `allowedDomains`, `humanlike`, `os`.
+**Session lifetime (v1.33.0+).** After a successful command batch and download drain, the browser closes and frees its concurrency slot. That is the default when both `sessionId` and `keepSessionAlive` are omitted.
+
+| First call | Later calls | Result |
+|---|---|---|
+| Omit both | — | One-shot. The browser is gone when the call returns. Passing an id afterward cannot restore it. |
+| `keepSessionAlive: true` | Echo the returned `sessionId` | Same browser, cookies, and history. Repeating the flag is unnecessary; the id keeps it alive. |
+| `keepSessionAlive: true`, or a returned `sessionId` | `keepSessionAlive: false`, or a `close` command | Force-close, including a session you had kept open. |
+
+`keepSessionAlive` is ignored for profile creation (`createProfile`) and attached sessions (`attachSessionId`). A kept session still ends after 15 minutes idle. If download collection fails, the server keeps the session so you can retry `getDownloads` with the `sessionId` from the error, then close it.
+
+**Key params:** `method`, `params`, `commands`, `sessionId`, `keepSessionAlive`, `profile`, `createProfile`, `proxy`, `record`, `allowedDomains`, `humanlike`, `os`.
 
 ### `browserless_skill`
 
@@ -110,9 +120,9 @@ In-house skills cover `shadow-dom`, `cookie-consent`, `modals`, `snapshot-misses
 
 ### `browserless_performance`
 
-Run a Lighthouse audit. Returns scores and metrics for accessibility, best-practices, performance, PWA, and SEO. Supports [performance budgets](https://developer.chrome.com/docs/lighthouse/performance/performance-budgets).
+Run a Lighthouse audit. Returns scores and metrics for accessibility, best-practices, performance, PWA, and SEO. Supports [performance budgets](https://web.dev/articles/use-lighthouse-for-performance-budgets). `device` is `mobile` (the default) or `desktop`. `config` is a Lighthouse config object; `categories` and `device` override the matching keys inside it.
 
-**Key params:** `url` (required), `categories`, `budgets`, `timeout`.
+**Key params:** `url` (required), `categories`, `device`, `config`, `budgets`, `timeout`, `profile`.
 
 > Audits typically take 30s–120s.
 
@@ -126,13 +136,13 @@ These five tools are **read-only** and scoped to the account behind the configur
 
 Plan, unit balance, billing period, and the *names* of the account's API keys. Never returns API token values.
 
-**Key params:** `action` (required).
+**Key params:** `action` (required: `billing` or `keys`). `billing` returns the plan, unit balance, and billing period. `keys` returns API key names and ids, never token values.
 
 ### `browserless_usage`
 
 Request and unit consumption: successes, errors, timeouts, queueing, peak concurrency, captchas, proxy bytes, units.
 
-**Key params:** `timeframe`, `apiKeyIds`.
+**Key params:** `timeframe` (`hour`, `day`, or `week`; default `day`), `apiKeyIds`.
 
 ### `browserless_logs`
 
@@ -165,7 +175,16 @@ Alongside its tools, the server exposes two read-only MCP resources. Tools are a
 | `browserless://status` | Browserless Service Status | `application/json` |
 | `browserless://api-docs` | Browserless API Documentation | `text/markdown` |
 
-Regenerate this list along with the tools:
+## Prompts
+
+The server also exposes two prompt templates:
+
+| Name | What it does |
+|---|---|
+| `scrape-url` | Scrape a page and summarize it |
+| `extract-content` | Extract specific information from a page using custom instructions |
+
+Regenerate the tool and resource lists:
 
 ```bash
 BROWSERLESS_TOKEN=your_token node scripts/verify-mcp.mjs
